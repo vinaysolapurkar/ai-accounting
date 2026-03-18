@@ -1,16 +1,11 @@
 const CACHE_NAME = "numba-v1";
 
-const APP_SHELL = ["/", "/dashboard", "/login", "/signup"];
-
-// Install: cache the app shell
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
-  );
+// Install: skip waiting, don't pre-cache pages (Next.js handles its own caching)
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
-// Activate: clean up old caches
+// Activate: clean up old caches and claim clients
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -24,58 +19,38 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch strategy
+// Fetch: only cache static assets, let everything else pass through
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  const url = new URL(request.url);
 
-  // Skip non-GET requests
+  // Only handle GET requests
   if (request.method !== "GET") return;
 
-  // Network-first for API calls
-  if (url.pathname.startsWith("/api/")) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
+  const url = new URL(request.url);
 
-  // Cache-first for static assets (JS, CSS, images, fonts)
+  // Never intercept API calls or auth routes
+  if (url.pathname.startsWith("/api/")) return;
+
+  // Cache-first for static assets only (JS, CSS, images, fonts)
   if (
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
-    url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|gif|woff2?|ttf|ico)$/)
+    url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|gif|woff2?|ttf|ico|webp)$/)
   ) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>
           cached ||
           fetch(request).then((response) => {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            }
             return response;
-          })
+          }).catch(() => cached)
       )
     );
-    return;
   }
 
-  // Network-first for navigation / HTML pages, with offline fallback
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        return response;
-      })
-      .catch(() =>
-        caches.match(request).then((cached) => cached || caches.match("/dashboard"))
-      )
-  );
+  // All other requests (pages, navigation): pass through to network, no caching
 });
