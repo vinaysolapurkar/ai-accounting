@@ -56,7 +56,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error: any) {
-    console.error("Auth error:", error);
-    return NextResponse.json({ error: error.message || "Server error" }, { status: 500 });
+    console.error("Auth error:", error?.stack || error);
+    return NextResponse.json({
+      error: error.message || "Server error",
+      stack: error?.stack?.split("\n").slice(0, 5),
+    }, { status: 500 });
   }
 }
