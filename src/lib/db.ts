@@ -1,4 +1,4 @@
-import { createClient, type Client } from "@libsql/client/web";
+import { createClient, type Client } from "@libsql/client";
 import { v4 as uuidv4 } from "uuid";
 
 let client: Client | null = null;
@@ -9,10 +9,6 @@ function getClient(): Client {
     const authToken = process.env.TURSO_AUTH_TOKEN;
     if (!url) {
       throw new Error("TURSO_DATABASE_URL is not set. Please configure it in your environment variables.");
-    }
-    // On serverless (Vercel), use HTTPS instead of libsql:// WebSocket protocol
-    if (url.startsWith("libsql://")) {
-      url = url.replace("libsql://", "https://");
     }
     client = createClient({
       url,
