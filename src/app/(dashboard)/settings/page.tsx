@@ -123,7 +123,7 @@ export default function SettingsPage() {
         }),
       });
 
-      const updated = { ...user, plan: planId };
+      const updated = { ...user, plan: planId as UserType["plan"] };
 
       if (res.ok) {
         const data = await res.json();
@@ -135,7 +135,6 @@ export default function SettingsPage() {
           setUser(updated);
         }
       } else {
-        // Fallback to local update
         localStorage.setItem("ledgerai_user", JSON.stringify(updated));
         setUser(updated);
       }
@@ -143,7 +142,7 @@ export default function SettingsPage() {
       setShowUpgrade(false);
       toast.success(`Upgraded to ${planId.charAt(0).toUpperCase() + planId.slice(1)} plan!`);
     } catch {
-      const updated = { ...user, plan: planId };
+      const updated = { ...user, plan: planId as UserType["plan"] };
       localStorage.setItem("ledgerai_user", JSON.stringify(updated));
       setUser(updated);
       setShowUpgrade(false);

@@ -1,0 +1,8 @@
+▲ Next.js 16.1.7
+- Local:         http://localhost:3000
+- Network:       http://100.65.54.83:3000
+
+✓ Starting...
+✓ Ready in 801ms
+(node:14044) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
