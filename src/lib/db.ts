@@ -5,15 +5,15 @@ let client: Client | null = null;
 
 function getClient(): Client {
   if (!client) {
-    let url = process.env.TURSO_DATABASE_URL;
-    const authToken = process.env.TURSO_AUTH_TOKEN;
+    let url = process.env.TURSO_DATABASE_URL || "";
+    const authToken = process.env.TURSO_AUTH_TOKEN || "";
     if (!url) {
-      throw new Error("TURSO_DATABASE_URL is not set. Please configure it in your environment variables.");
+      throw new Error("TURSO_DATABASE_URL is not set");
     }
-    client = createClient({
-      url,
-      authToken: authToken || undefined,
-    });
+    // Normalize: strip any trailing whitespace/newlines from env vars
+    url = url.trim();
+    const token = authToken.trim();
+    client = createClient({ url, authToken: token || undefined });
   }
   return client;
 }
