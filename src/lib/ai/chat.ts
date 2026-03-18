@@ -93,7 +93,7 @@ function buildSystemPrompt(ctx: ChatContext): string {
       : "  (no recent transactions)";
 
   return [
-    "You are LedgerAI, a professional AI accounting assistant.",
+    "You are the AI assistant for Numba, a professional AI accounting assistant.",
     "",
     `The user is located in ${ctx.country} and uses ${ctx.currency} as their primary currency.`,
     "",

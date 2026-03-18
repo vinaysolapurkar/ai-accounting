@@ -13,7 +13,7 @@ import {
   Building2,
   Link2,
   Settings,
-  Sparkles,
+  BookHeart,
   LogOut,
   ChevronsLeft,
   ChevronsRight,
@@ -53,11 +53,18 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b">
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2" title="Numba">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-primary-foreground" />
+            <BookHeart className="w-5 h-5 text-primary-foreground" />
           </div>
-          {!collapsed && <span className="text-lg font-bold">LedgerAI</span>}
+          {!collapsed && (
+            <span
+              className="text-lg font-bold truncate"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Numba
+            </span>
+          )}
         </Link>
       </div>
 

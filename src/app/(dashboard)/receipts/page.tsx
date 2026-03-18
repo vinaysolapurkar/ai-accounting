@@ -1,15 +1,28 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Camera, Upload, FileImage, Loader2, Check, X, Edit2, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { NewAccountDialog } from "@/components/new-account-dialog";
+import { getPlanLimits } from "@/lib/plan-limits";
+
+function getUser() {
+  try {
+    return JSON.parse(localStorage.getItem("ledgerai_user") || "{}");
+  } catch { return {}; }
+}
+
+function getUserId(): string {
+  return getUser().id || "";
+}
 
 interface ExtractedReceipt {
   vendor: string;
@@ -21,25 +34,146 @@ interface ExtractedReceipt {
   currency: string;
 }
 
+interface PastReceipt {
+  id: string;
+  extracted_vendor: string;
+  extracted_amount: number;
+  extracted_date: string;
+  extracted_category: string;
+  status: string;
+  created_at: string;
+}
+
 export default function ReceiptsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedReceipt | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [pastReceipts, setPastReceipts] = useState<PastReceipt[]>([]);
+  const [loadingReceipts, setLoadingReceipts] = useState(true);
+  const [confirming, setConfirming] = useState(false);
+  const [accounts, setAccounts] = useState<{ id: string; name: string; code: string; type: string }[]>([]);
+  const [debitAccountId, setDebitAccountId] = useState("");
+  const [creditAccountId, setCreditAccountId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  const fetchReceipts = useCallback(async () => {
+    const userId = getUserId();
+    if (!userId) { setLoadingReceipts(false); return; }
+    try {
+      const res = await fetch("/api/receipts", {
+        headers: { "x-user-id": userId },
+      });
+      if (!res.ok) throw new Error("Failed to fetch receipts");
+      const data = await res.json();
+      setPastReceipts(data);
+    } catch (err) {
+      console.error("Failed to fetch receipts:", err);
+    } finally {
+      setLoadingReceipts(false);
+    }
+  }, []);
+
+  const fetchAccounts = useCallback(async () => {
+    const userId = getUserId();
+    if (!userId) return;
+    try {
+      const res = await fetch("/api/accounts", { headers: { "x-user-id": userId } });
+      if (res.ok) setAccounts(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    fetchReceipts();
+    fetchAccounts();
+  }, [fetchReceipts, fetchAccounts]);
+
+  // Auto-detect debit/credit accounts when receipt is extracted
+  useEffect(() => {
+    if (!extractedData || accounts.length === 0) return;
+
+    const category = (extractedData.category || "").toLowerCase();
+    const vendor = (extractedData.vendor || "").toLowerCase();
+
+    // Category-to-account keyword mapping
+    const categoryMap: Record<string, string[]> = {
+      "food": ["food", "meal", "dining", "restaurant"],
+      "travel": ["travel", "transport", "uber", "cab", "fuel", "gas"],
+      "office": ["office", "supplies", "stationery"],
+      "software": ["software", "subscription", "cloud", "hosting", "saas", "aws", "adobe"],
+      "utilities": ["utility", "utilities", "electric", "water", "internet", "phone"],
+      "rent": ["rent", "lease", "wework", "coworking"],
+      "marketing": ["marketing", "ads", "advertising", "google ads", "facebook"],
+    };
+
+    // Find best matching expense account
+    let bestExpense = "";
+    for (const [, keywords] of Object.entries(categoryMap)) {
+      if (keywords.some(k => category.includes(k) || vendor.includes(k))) {
+        // Find an expense account whose name matches these keywords
+        const match = accounts.find(a =>
+          a.type === "expense" && keywords.some(k => a.name.toLowerCase().includes(k))
+        );
+        if (match) { bestExpense = match.id; break; }
+      }
+    }
+    // Fallback: first expense account
+    if (!bestExpense) {
+      const fallback = accounts.find(a => a.type === "expense");
+      if (fallback) bestExpense = fallback.id;
+    }
+
+    // Credit side: prefer bank, then cash
+    const bankAcc = accounts.find(a => a.code === "1010" || (a.type === "asset" && a.name.toLowerCase().includes("bank")));
+    const cashAcc = accounts.find(a => a.code === "1000" || (a.type === "asset" && a.name.toLowerCase().includes("cash")));
+    const bestCredit = bankAcc?.id || cashAcc?.id || "";
+
+    if (bestExpense) setDebitAccountId(bestExpense);
+    if (bestCredit) setCreditAccountId(bestCredit);
+  }, [extractedData, accounts]);
+
   const processReceipt = useCallback(async (file: File) => {
+    // Check plan limits
+    const user = getUser();
+    const limits = getPlanLimits(user.plan || "free");
+    if (limits.receiptsPerMonth !== Infinity) {
+      const monthReceipts = pastReceipts.filter(r => {
+        const d = new Date(r.created_at);
+        const now = new Date();
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      });
+      if (monthReceipts.length >= limits.receiptsPerMonth) {
+        toast.error(`Free plan limit: ${limits.receiptsPerMonth} receipts/month. Upgrade to Pro for unlimited.`);
+        return;
+      }
+    }
+
     setIsProcessing(true);
     setPreviewUrl(URL.createObjectURL(file));
+    const userId = getUserId();
 
     try {
       const base64 = await fileToBase64(file);
 
+      // Try client-side OCR first using canvas for text extraction
+      let ocrText = "";
+      try {
+        ocrText = await clientSideOCR(file);
+      } catch {
+        // Client-side OCR not available, will send image directly
+      }
+
       const response = await fetch("/api/ocr", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64 }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(userId ? { "x-user-id": userId } : {}),
+        },
+        body: JSON.stringify({
+          image: base64,
+          ...(ocrText ? { ocrText } : {}),
+        }),
       });
 
       if (!response.ok) throw new Error("OCR failed");
@@ -78,19 +212,56 @@ export default function ReceiptsPage() {
     if (file) processReceipt(file);
   }, [processReceipt]);
 
-  const handleConfirm = () => {
-    toast.success("Transaction created from receipt!");
-    setExtractedData(null);
-    setPreviewUrl(null);
+  const handleConfirm = async () => {
+    if (!extractedData) return;
+    const userId = getUserId();
+    if (!userId) { toast.error("Not logged in"); return; }
+    if (!debitAccountId || !creditAccountId) {
+      toast.error("Select both debit and credit accounts");
+      return;
+    }
+
+    setConfirming(true);
+    try {
+      const res = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": userId },
+        body: JSON.stringify({
+          date: extractedData.date,
+          description: extractedData.vendor,
+          source: "receipt_scan",
+          currency: extractedData.currency,
+          lines: [
+            { account_id: debitAccountId, debit: extractedData.amount, credit: 0 },
+            { account_id: creditAccountId, debit: 0, credit: extractedData.amount },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create transaction");
+      }
+
+      toast.success("Transaction created from receipt!");
+      setExtractedData(null);
+      setPreviewUrl(null);
+      setDebitAccountId("");
+      setCreditAccountId("");
+      fetchReceipts();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create transaction from receipt");
+    } finally {
+      setConfirming(false);
+    }
   };
 
-  const pastReceipts = [
-    { id: "1", vendor: "Amazon", amount: 2340, date: "Mar 17", status: "linked", category: "Office" },
-    { id: "2", vendor: "Uber", amount: 450, date: "Mar 16", status: "pending", category: "Transport" },
-    { id: "3", vendor: "WeWork", amount: 15000, date: "Mar 15", status: "linked", category: "Rent" },
-    { id: "4", vendor: "Starbucks", amount: 380, date: "Mar 14", status: "reviewed", category: "Food" },
-    { id: "5", vendor: "Adobe", amount: 1500, date: "Mar 13", status: "linked", category: "Software" },
-  ];
+  const formatDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    } catch { return dateStr; }
+  };
 
   return (
     <div className="space-y-6">
@@ -203,9 +374,44 @@ export default function ReceiptsPage() {
                     </div>
                   )}
 
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Debit Account</Label>
+                      <Select value={debitAccountId} onValueChange={(v) => setDebitAccountId(v || "")}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select...">
+                            {(() => { const a = accounts.find(x => x.id === debitAccountId); return a ? `${a.code} - ${a.name}` : undefined; })()}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Credit Account</Label>
+                      <Select value={creditAccountId} onValueChange={(v) => setCreditAccountId(v || "")}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select...">
+                            {(() => { const a = accounts.find(x => x.id === creditAccountId); return a ? `${a.code} - ${a.name}` : undefined; })()}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <NewAccountDialog userId={getUserId()} onCreated={fetchAccounts} />
+
                   <div className="flex gap-3 pt-2">
-                    <Button className="flex-1" onClick={handleConfirm}>
-                      <Check className="w-4 h-4 mr-2" /> Confirm & Create Transaction
+                    <Button className="flex-1" onClick={handleConfirm} disabled={confirming || !debitAccountId || !creditAccountId}>
+                      {confirming ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                      Confirm & Create Transaction
                     </Button>
                     <Button variant="outline" onClick={() => { setExtractedData(null); setPreviewUrl(null); }}>
                       <X className="w-4 h-4" />
@@ -223,32 +429,53 @@ export default function ReceiptsPage() {
             <CardTitle className="text-lg">Recent Receipts</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {pastReceipts.map((r) => (
-                <div key={r.id} className="flex items-center justify-between p-3 border rounded-lg hover:shadow-sm transition-shadow">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                      <FileImage className="w-5 h-5 text-muted-foreground" />
+            {loadingReceipts ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading receipts...</span>
+              </div>
+            ) : pastReceipts.length === 0 ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                No receipts yet. Upload your first receipt to get started.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pastReceipts.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between p-3 border rounded-lg hover:shadow-sm transition-shadow">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                        <FileImage className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{r.extracted_vendor || "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(r.extracted_date || r.created_at)} &middot; {r.extracted_category || "Uncategorized"}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{r.vendor}</p>
-                      <p className="text-xs text-muted-foreground">{r.date} &middot; {r.category}</p>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold">₹{(Number(r.extracted_amount) || 0).toLocaleString()}</p>
+                      <Badge variant={r.status === "linked" ? "default" : r.status === "pending" ? "secondary" : "outline"} className="text-xs">
+                        {r.status}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold">₹{r.amount.toLocaleString()}</p>
-                    <Badge variant={r.status === "linked" ? "default" : r.status === "pending" ? "secondary" : "outline"} className="text-xs">
-                      {r.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
     </div>
   );
+}
+
+async function clientSideOCR(file: File): Promise<string> {
+  const Tesseract = await import("tesseract.js");
+  const { data: { text } } = await Tesseract.recognize(file, "eng", {
+    logger: () => {}, // suppress logs
+  });
+  return text.trim();
 }
 
 function fileToBase64(file: File): Promise<string> {

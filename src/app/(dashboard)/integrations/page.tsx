@@ -1,81 +1,182 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link2, Download, ExternalLink, Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Link2, Download, ExternalLink, Loader2, Check, FileSpreadsheet, FileText, FileCode, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { getPlanLimits } from "@/lib/plan-limits";
+
+function getUserId(): string {
+  try {
+    return JSON.parse(localStorage.getItem("ledgerai_user") || "{}").id || "";
+  } catch { return ""; }
+}
 
 const integrations = [
   {
     name: "Tally",
-    description: "Export vouchers, masters, and ledgers in Tally XML format",
+    description: "Export vouchers, masters, and ledgers in Tally XML format for TallyPrime / ERP 9",
     type: "export",
-    status: "available",
     logo: "T",
     color: "bg-red-100 text-red-600",
+    action: "export",
+    format: "tally",
   },
   {
     name: "QuickBooks",
-    description: "Sync invoices, expenses, and accounts via OAuth API",
-    type: "sync",
-    status: "available",
+    description: "Import your transactions and chart of accounts into QuickBooks via CSV",
+    type: "export",
     logo: "QB",
     color: "bg-green-100 text-green-600",
+    action: "export",
+    format: "csv",
   },
   {
     name: "Sage",
-    description: "Sync ledger accounts, payments, and contacts",
-    type: "sync",
-    status: "available",
+    description: "Export ledger accounts, payments, and contacts in CSV format for Sage import",
+    type: "export",
     logo: "S",
     color: "bg-emerald-100 text-emerald-600",
+    action: "export",
+    format: "csv",
   },
   {
     name: "Zoho Books",
-    description: "Sync invoices, expenses, and chart of accounts",
-    type: "sync",
-    status: "available",
+    description: "Export transactions and chart of accounts for Zoho Books CSV import",
+    type: "export",
     logo: "Z",
     color: "bg-yellow-100 text-yellow-600",
+    action: "export",
+    format: "csv",
   },
   {
     name: "Wave",
-    description: "Sync businesses, invoices, and transactions via GraphQL",
-    type: "sync",
-    status: "available",
+    description: "Export all financial data in JSON format compatible with Wave import",
+    type: "export",
     logo: "W",
     color: "bg-blue-100 text-blue-600",
+    action: "export",
+    format: "json",
   },
   {
     name: "SAP Business One",
-    description: "Sync journal entries and business partners via OData",
-    type: "sync",
-    status: "available",
+    description: "Export journal entries and accounts in CSV format for SAP import",
+    type: "export",
     logo: "SAP",
     color: "bg-indigo-100 text-indigo-600",
+    action: "export",
+    format: "csv",
   },
 ];
 
 const exportFormats = [
-  { name: "CSV", description: "Comma-separated values — works with Excel, Google Sheets" },
-  { name: "PDF", description: "Professional reports for printing and sharing" },
-  { name: "Tally XML", description: "Import-ready format for Tally ERP 9 / TallyPrime" },
+  { name: "CSV", description: "Comma-separated values — works with Excel, Google Sheets", icon: FileSpreadsheet, format: "csv", type: "all" },
+  { name: "JSON", description: "Full data export — transactions, accounts, reports", icon: FileCode, format: "json", type: "all" },
+  { name: "Tally XML", description: "Import-ready format for Tally ERP 9 / TallyPrime", icon: FileText, format: "tally", type: "all" },
 ];
 
 export default function IntegrationsPage() {
+  const [exporting, setExporting] = useState<string | null>(null);
+  const user = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("ledgerai_user") || "{}") : {};
+  const limits = getPlanLimits(user.plan || "free");
+
+  const handleExport = async (format: string, type: string, label: string) => {
+    const userId = getUserId();
+    if (!userId) { toast.error("Not logged in"); return; }
+
+    // Check plan for Tally export
+    const user = JSON.parse(localStorage.getItem("ledgerai_user") || "{}");
+    const limits = getPlanLimits(user.plan || "free");
+    if (format === "tally" && !limits.tallyExport) {
+      toast.error("Tally export requires Pro plan or above. Upgrade in Settings.");
+      return;
+    }
+
+    setExporting(label);
+    try {
+      const res = await fetch(`/api/integrations?format=${format}&type=${type}`, {
+        headers: { "x-user-id": userId },
+      });
+
+      if (!res.ok) throw new Error("Export failed");
+
+      const contentType = res.headers.get("content-type") || "";
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      let ext = "csv";
+      if (format === "json") ext = "json";
+      if (format === "tally") ext = "xml";
+
+      a.href = url;
+      a.download = `numba-${type}-${new Date().toISOString().split("T")[0]}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`${label} export downloaded!`);
+    } catch {
+      toast.error(`Failed to export ${label}`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Link2 className="w-6 h-6" /> Integrations
+          <Link2 className="w-6 h-6" /> Integrations & Export
         </h1>
-        <p className="text-muted-foreground text-sm">Connect with your favorite accounting software</p>
+        <p className="text-muted-foreground text-sm">Export your data to your favorite accounting software</p>
+      </div>
+
+      {/* Export Formats */}
+      <div>
+        <h2 className="text-lg font-semibold mb-4">Quick Export</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {exportFormats.map((fmt) => (
+            <Card key={fmt.name} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <fmt.icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">{fmt.name}</p>
+                    <p className="text-xs text-muted-foreground">{fmt.description}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  disabled={exporting === fmt.name}
+                  onClick={() => handleExport(fmt.format, fmt.type, fmt.name)}
+                >
+                  {exporting === fmt.name ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Export All Data
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/* Platform Integrations */}
       <div>
-        <h2 className="text-lg font-semibold mb-4">Platform Integrations</h2>
+        <h2 className="text-lg font-semibold mb-4">Export to Platform</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {integrations.map((int) => (
             <Card key={int.name} className="hover:shadow-md transition-shadow">
@@ -94,42 +195,20 @@ export default function IntegrationsPage() {
                       size="sm"
                       variant={int.name === "Tally" ? "default" : "outline"}
                       className="w-full"
-                      onClick={() => {
-                        if (int.name === "Tally") {
-                          toast.success("Tally XML export started!");
-                        } else {
-                          toast.info(`${int.name} integration requires OAuth setup. Coming soon!`);
-                        }
-                      }}
+                      disabled={exporting === int.name}
+                      onClick={() => handleExport(int.format, "all", int.name)}
                     >
-                      {int.name === "Tally" ? (
-                        <><Download className="w-4 h-4 mr-2" /> Export to Tally</>
+                      {exporting === int.name ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : int.format === "tally" && !limits.tallyExport ? (
+                        <Lock className="w-4 h-4 mr-2" />
                       ) : (
-                        <><ExternalLink className="w-4 h-4 mr-2" /> Connect</>
+                        <Download className="w-4 h-4 mr-2" />
                       )}
+                      {int.format === "tally" && !limits.tallyExport ? "Pro Plan" : `Export for ${int.name}`}
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Export Formats */}
-      <div>
-        <h2 className="text-lg font-semibold mb-4">Export Formats</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {exportFormats.map((fmt) => (
-            <Card key={fmt.name}>
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{fmt.name}</p>
-                  <p className="text-xs text-muted-foreground">{fmt.description}</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => toast.success(`${fmt.name} export started!`)}>
-                  <Download className="w-4 h-4" />
-                </Button>
               </CardContent>
             </Card>
           ))}

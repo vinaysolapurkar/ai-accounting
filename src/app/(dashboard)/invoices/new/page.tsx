@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { COUNTRY_CONFIG, type CountryCode } from "@/lib/supabase/types";
+
+function getUser() {
+  try {
+    return JSON.parse(localStorage.getItem("ledgerai_user") || "{}");
+  } catch { return {}; }
+}
 
 interface LineItem {
   description: string;
@@ -23,7 +30,46 @@ export default function NewInvoicePage() {
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { description: "", quantity: 1, unitPrice: 0 },
   ]);
-  const [taxRate, setTaxRate] = useState(18);
+  const [submitting, setSubmitting] = useState(false);
+
+  // User context
+  const [userCountry, setUserCountry] = useState<CountryCode>("IN");
+  const [currency, setCurrency] = useState("INR");
+  const [currencySymbol, setCurrencySymbol] = useState("₹");
+
+  // Form fields
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [clientTaxId, setClientTaxId] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState("INV-0001");
+  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
+  const [dueDate, setDueDate] = useState("");
+  const [taxRate, setTaxRate] = useState(0);
+
+  // Load user's country and set defaults
+  useEffect(() => {
+    const user = getUser();
+    const country = (user.country || "IN") as CountryCode;
+    const config = COUNTRY_CONFIG[country];
+    if (config) {
+      setUserCountry(country);
+      setCurrency(config.currency);
+      setCurrencySymbol(config.currencySymbol);
+      setTaxRate(config.defaultTaxRate);
+    }
+
+    // Fetch next invoice number
+    if (user.id) {
+      fetch("/api/invoices?action=next-number", {
+        headers: { "x-user-id": user.id },
+      }).then(r => r.ok ? r.json() : null).then(d => {
+        if (d?.invoiceNumber) setInvoiceNumber(d.invoiceNumber);
+      }).catch(() => {});
+    }
+  }, []);
+
+  const config = COUNTRY_CONFIG[userCountry];
+  const taxRates = config?.taxRates || [];
 
   const subtotal = lineItems.reduce((s, item) => s + item.quantity * item.unitPrice, 0);
   const taxAmount = subtotal * (taxRate / 100);
@@ -43,14 +89,52 @@ export default function NewInvoicePage() {
     setLineItems(updated);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Invoice created successfully!");
-    router.push("/invoices");
+    const user = getUser();
+    if (!user.id) { toast.error("Not logged in"); return; }
+    if (!clientName) { toast.error("Client name is required"); return; }
+    if (!dueDate) { toast.error("Due date is required"); return; }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        body: JSON.stringify({
+          client_name: clientName,
+          client_email: clientEmail || undefined,
+          client_tax_id: clientTaxId || undefined,
+          invoice_number: invoiceNumber,
+          date: invoiceDate,
+          due_date: dueDate,
+          subtotal,
+          tax_total: taxAmount,
+          total,
+          currency,
+          line_items: lineItems.map(item => ({
+            description: item.description,
+            quantity: item.quantity,
+            unit_price: item.unitPrice,
+            amount: item.quantity * item.unitPrice,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create invoice");
+      }
+      toast.success("Invoice created successfully!");
+      router.push("/invoices");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create invoice");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/invoices"><Button variant="ghost" size="icon"><ArrowLeft className="w-5 h-5" /></Button></Link>
         <h1 className="text-2xl font-bold">New Invoice</h1>
@@ -64,22 +148,12 @@ export default function NewInvoicePage() {
               <CardHeader><CardTitle className="text-lg">Client Details</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div><Label>Client Name</Label><Input placeholder="Company or person name" required /></div>
-                  <div><Label>Client Email</Label><Input type="email" placeholder="client@example.com" /></div>
+                  <div><Label>Client Name</Label><Input placeholder="Company or person name" required value={clientName} onChange={(e) => setClientName(e.target.value)} /></div>
+                  <div><Label>Client Email</Label><Input type="email" placeholder="client@example.com" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} /></div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div><Label>Tax ID (GSTIN/VAT)</Label><Input placeholder="Optional" /></div>
-                  <div><Label>Country</Label>
-                    <Select defaultValue="IN">
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="IN">India</SelectItem>
-                        <SelectItem value="US">United States</SelectItem>
-                        <SelectItem value="UK">United Kingdom</SelectItem>
-                        <SelectItem value="AU">Australia</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div>
+                  <Label>Tax ID ({config?.taxType === "GST" ? "GSTIN" : config?.taxType === "VAT" ? "VAT Number" : "Tax ID"})</Label>
+                  <Input placeholder="Optional" value={clientTaxId} onChange={(e) => setClientTaxId(e.target.value)} />
                 </div>
               </CardContent>
             </Card>
@@ -103,7 +177,7 @@ export default function NewInvoicePage() {
                       <Input type="number" min={0} value={item.unitPrice} onChange={(e) => updateLineItem(i, "unitPrice", parseFloat(e.target.value) || 0)} />
                     </div>
                     <div className="col-span-1 text-right font-mono text-sm py-2">
-                      ₹{(item.quantity * item.unitPrice).toLocaleString()}
+                      {currencySymbol}{(item.quantity * item.unitPrice).toLocaleString()}
                     </div>
                     <div className="col-span-1">
                       {lineItems.length > 1 && (
@@ -126,22 +200,21 @@ export default function NewInvoicePage() {
             <Card>
               <CardHeader><CardTitle className="text-lg">Invoice Details</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div><Label>Invoice Number</Label><Input defaultValue="INV-006" /></div>
-                <div><Label>Date</Label><Input type="date" defaultValue={new Date().toISOString().split("T")[0]} /></div>
-                <div><Label>Due Date</Label><Input type="date" /></div>
+                <div><Label>Invoice Number</Label><Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} /></div>
+                <div><Label>Date</Label><Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} /></div>
+                <div><Label>Due Date</Label><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
                 <div>
-                  <Label>Tax Rate (%)</Label>
-                  <Select value={taxRate.toString()} onValueChange={(v) => setTaxRate(parseInt(v || "0"))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Label>{config?.taxType || "Tax"} Rate</Label>
+                  <Select value={taxRate.toString()} onValueChange={(v) => setTaxRate(parseFloat(v || "0"))}>
+                    <SelectTrigger>
+                      <SelectValue>
+                        {(() => { const r = taxRates.find(t => t.rate === taxRate); return r ? r.label : `${taxRate}%`; })()}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">No Tax (0%)</SelectItem>
-                      <SelectItem value="5">GST 5%</SelectItem>
-                      <SelectItem value="12">GST 12%</SelectItem>
-                      <SelectItem value="18">GST 18%</SelectItem>
-                      <SelectItem value="28">GST 28%</SelectItem>
-                      <SelectItem value="10">GST 10% (AU)</SelectItem>
-                      <SelectItem value="15">GST 15% (NZ)</SelectItem>
-                      <SelectItem value="20">VAT 20% (UK)</SelectItem>
+                      {taxRates.map((t) => (
+                        <SelectItem key={t.rate} value={t.rate.toString()}>{t.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -150,15 +223,18 @@ export default function NewInvoicePage() {
 
             <Card>
               <CardContent className="p-4 space-y-2">
-                <div className="flex justify-between text-sm"><span>Subtotal</span><span className="font-mono">₹{subtotal.toLocaleString()}</span></div>
-                <div className="flex justify-between text-sm"><span>Tax ({taxRate}%)</span><span className="font-mono">₹{taxAmount.toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span>Subtotal</span><span className="font-mono">{currencySymbol}{subtotal.toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span>{config?.taxType || "Tax"} ({taxRate}%)</span><span className="font-mono">{currencySymbol}{taxAmount.toLocaleString()}</span></div>
                 <Separator />
-                <div className="flex justify-between font-bold text-lg"><span>Total</span><span className="font-mono">₹{total.toLocaleString()}</span></div>
+                <div className="flex justify-between font-bold text-lg"><span>Total</span><span className="font-mono">{currencySymbol}{total.toLocaleString()}</span></div>
               </CardContent>
             </Card>
 
             <div className="space-y-2">
-              <Button type="submit" className="w-full">Create Invoice</Button>
+              <Button type="submit" className="w-full" disabled={submitting}>
+                {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Create Invoice
+              </Button>
               <Button type="button" variant="outline" className="w-full">Save as Draft</Button>
             </div>
           </div>

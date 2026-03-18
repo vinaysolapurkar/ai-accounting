@@ -12,7 +12,7 @@ export async function POST() {
       <REQUESTDESC>
         <REPORTNAME>All Masters</REPORTNAME>
         <STATICVARIABLES>
-          <SVCURRENTCOMPANY>LedgerAI Export</SVCURRENTCOMPANY>
+          <SVCURRENTCOMPANY>Numba Export</SVCURRENTCOMPANY>
         </STATICVARIABLES>
       </REQUESTDESC>
       <REQUESTDATA>

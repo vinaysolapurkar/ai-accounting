@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Loader2, BookHeart } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -23,23 +22,20 @@ export default function SignupPage() {
     setError("");
 
     try {
-      await new Promise((r) => setTimeout(r, 800));
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "signup", email, password, businessName }),
+      });
 
-      const newUser = {
-        id: "demo-user-" + Date.now(),
-        email,
-        business_name: businessName,
-        business_type: null,
-        country: "",
-        currency: "",
-        tax_id: null,
-        plan: "free" as const,
-        fiscal_year_start: 1,
-        onboarding_complete: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      localStorage.setItem("ledgerai_user", JSON.stringify(newUser));
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Signup failed. Please try again.");
+        return;
+      }
+
+      localStorage.setItem("ledgerai_user", JSON.stringify(data.user));
       router.push("/onboarding");
     } catch {
       setError("Signup failed. Please try again.");
@@ -49,40 +45,56 @@ export default function SignupPage() {
   };
 
   return (
-    <>
-      <div className="lg:hidden flex items-center gap-2 mb-8">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-          <Sparkles className="w-5 h-5 text-primary-foreground" />
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md space-y-8">
+        {/* Brand */}
+        <div className="flex flex-col items-center gap-3">
+          <BookHeart className="w-10 h-10 text-primary" />
+          <span
+            className="text-xl font-semibold text-foreground tracking-tight"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Numba
+          </span>
         </div>
-        <span className="text-xl font-bold">LedgerAI</span>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Create your account</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Start managing your books with AI in minutes
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSignup} className="space-y-4">
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6 animate-fade-up">
+          <div className="space-y-1 text-center">
+            <h2
+              className="text-2xl text-foreground"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Create your account
+            </h2>
+            <p className="text-sm text-muted-foreground">Get started in under a minute</p>
+          </div>
+
+          <form onSubmit={handleSignup} className="space-y-5">
             {error && (
-              <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg">
                 {error}
               </div>
             )}
+
             <div className="space-y-2">
-              <Label htmlFor="businessName">Business Name</Label>
+              <Label htmlFor="businessName" className="text-foreground text-sm">
+                Business Name
+              </Label>
               <Input
                 id="businessName"
                 placeholder="Your business name"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 required
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary/20"
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-foreground text-sm">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -90,10 +102,14 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary/20"
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-foreground text-sm">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -102,24 +118,36 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={8}
                 required
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary/20"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+
+            <Button
+              type="submit"
+              className="w-full h-11 bg-primary hover:bg-primary/90 text-white font-medium transition-colors"
+              disabled={isLoading}
+            >
               {isLoading ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</>
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...
+                </>
               ) : (
                 "Create account"
               )}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
+
+          <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline font-medium">
+            <Link
+              href="/login"
+              className="text-primary hover:text-primary/80 font-medium transition-colors"
+            >
               Sign in
             </Link>
           </p>
-        </CardContent>
-      </Card>
-    </>
+        </div>
+      </div>
+    </div>
   );
 }

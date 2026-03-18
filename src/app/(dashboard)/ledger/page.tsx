@@ -1,38 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Loader2 } from "lucide-react";
+import { NewAccountDialog } from "@/components/new-account-dialog";
 
-const accounts = [
-  { code: "1000", name: "Cash", type: "asset", balance: 245000 },
-  { code: "1010", name: "Bank Account", type: "asset", balance: 580000 },
-  { code: "1100", name: "Accounts Receivable", type: "asset", balance: 150000 },
-  { code: "1500", name: "Fixed Assets", type: "asset", balance: 300000 },
-  { code: "2000", name: "Accounts Payable", type: "liability", balance: 85000 },
-  { code: "2100", name: "GST Payable", type: "liability", balance: 12000 },
-  { code: "3000", name: "Owner's Equity", type: "equity", balance: 500000 },
-  { code: "3100", name: "Retained Earnings", type: "equity", balance: 98000 },
-  { code: "4000", name: "Service Revenue", type: "revenue", balance: 485000 },
-  { code: "4100", name: "Product Revenue", type: "revenue", balance: 120000 },
-  { code: "5000", name: "Cost of Services", type: "expense", balance: 95000 },
-  { code: "6000", name: "Rent Expense", type: "expense", balance: 45000 },
-  { code: "6100", name: "Utilities", type: "expense", balance: 12500 },
-  { code: "6200", name: "Office Supplies", type: "expense", balance: 8700 },
-  { code: "6300", name: "Travel & Transport", type: "expense", balance: 15800 },
-  { code: "6400", name: "Food & Dining", type: "expense", balance: 7200 },
-  { code: "6500", name: "Software & Subscriptions", type: "expense", balance: 22400 },
-  { code: "6600", name: "Marketing", type: "expense", balance: 18000 },
-  { code: "7000", name: "GST Input Credit", type: "asset", balance: 28000 },
-];
+function getUserId(): string {
+  try {
+    return JSON.parse(localStorage.getItem("ledgerai_user") || "{}").id || "";
+  } catch { return ""; }
+}
 
-const ledgerEntries = [
-  { date: "2026-03-17", description: "Amazon Office Supplies", debit: 2340, credit: 0, balance: 8700 },
-  { date: "2026-03-15", description: "Opening Balance", debit: 6360, credit: 0, balance: 6360 },
-];
+interface Account {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  balance: number;
+  total_debit: number;
+  total_credit: number;
+}
 
 const typeColors: Record<string, string> = {
   asset: "bg-blue-100 text-blue-700",
@@ -45,8 +35,58 @@ const typeColors: Record<string, string> = {
 export default function LedgerPage() {
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchAccounts = useCallback(async () => {
+    const userId = getUserId();
+    if (!userId) { setLoading(false); return; }
+    try {
+      const res = await fetch("/api/reports?type=trial-balance", {
+        headers: { "x-user-id": userId },
+      });
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      // trial-balance returns { entries, totalDebits, totalCredits, isBalanced }
+      // entries have: id, code, name, type, balance, total_debit, total_credit, debit, credit
+      if (data.entries) {
+        setAccounts(data.entries.map((e: any) => ({
+          id: e.id,
+          code: e.code,
+          name: e.name,
+          type: e.type,
+          balance: Number(e.balance) || 0,
+          total_debit: Number(e.total_debit) || 0,
+          total_credit: Number(e.total_credit) || 0,
+        })));
+      }
+    } catch {
+      // Fallback: try the accounts endpoint
+      try {
+        const res = await fetch("/api/accounts", {
+          headers: { "x-user-id": getUserId() },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAccounts(data.map((a: any) => ({
+            ...a,
+            balance: 0,
+            total_debit: 0,
+            total_credit: 0,
+          })));
+        }
+      } catch { /* ignore */ }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   const filtered = accounts.filter(a => typeFilter === "all" || a.type === typeFilter);
+  const selectedAccountData = accounts.find(a => a.code === selectedAccount);
 
   return (
     <div className="space-y-6">
@@ -57,7 +97,7 @@ export default function LedgerPage() {
         <p className="text-muted-foreground text-sm">Chart of accounts with balances</p>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 items-center justify-between">
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v || "all")}>
           <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filter by type" /></SelectTrigger>
           <SelectContent>
@@ -69,6 +109,7 @@ export default function LedgerPage() {
             <SelectItem value="expense">Expenses</SelectItem>
           </SelectContent>
         </Select>
+        <NewAccountDialog userId={getUserId()} onCreated={fetchAccounts} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -77,66 +118,75 @@ export default function LedgerPage() {
             <CardTitle className="text-lg">Chart of Accounts</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Account Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((a) => (
-                  <TableRow
-                    key={a.code}
-                    className={`cursor-pointer ${selectedAccount === a.code ? "bg-primary/5" : "hover:bg-muted/50"}`}
-                    onClick={() => setSelectedAccount(a.code)}
-                  >
-                    <TableCell className="font-mono text-sm">{a.code}</TableCell>
-                    <TableCell className="font-medium">{a.name}</TableCell>
-                    <TableCell>
-                      <Badge className={`${typeColors[a.type]} text-xs`} variant="secondary">{a.type}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">₹{a.balance.toLocaleString()}</TableCell>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Loading accounts...</span>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                No accounts found.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Account Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Balance</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((a) => (
+                    <TableRow
+                      key={a.code}
+                      className={`cursor-pointer ${selectedAccount === a.code ? "bg-primary/5" : "hover:bg-muted/50"}`}
+                      onClick={() => setSelectedAccount(a.code)}
+                    >
+                      <TableCell className="font-mono text-sm">{a.code}</TableCell>
+                      <TableCell className="font-medium">{a.name}</TableCell>
+                      <TableCell>
+                        <Badge className={`${typeColors[a.type] || ""} text-xs`} variant="secondary">{a.type}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">₹{(Number(a.balance) || 0).toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">
-              {selectedAccount ? accounts.find(a => a.code === selectedAccount)?.name : "Select an account"}
+              {selectedAccountData ? selectedAccountData.name : "Select an account"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {selectedAccount ? (
+            {selectedAccountData ? (
               <div className="space-y-4">
                 <div className="p-3 bg-muted/50 rounded-lg">
                   <p className="text-sm text-muted-foreground">Current Balance</p>
-                  <p className="text-2xl font-bold">₹{accounts.find(a => a.code === selectedAccount)?.balance.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">₹{(Number(selectedAccountData.balance) || 0).toLocaleString()}</p>
                 </div>
-                <div>
-                  <p className="text-sm font-medium mb-2">Recent Entries</p>
-                  {ledgerEntries.map((entry, i) => (
-                    <div key={i} className="flex justify-between py-2 border-b last:border-0 text-sm">
-                      <div>
-                        <p className="font-medium">{entry.description}</p>
-                        <p className="text-xs text-muted-foreground">{entry.date}</p>
-                      </div>
-                      <div className="text-right">
-                        {entry.debit > 0 && <p className="text-red-500">Dr ₹{entry.debit.toLocaleString()}</p>}
-                        {entry.credit > 0 && <p className="text-green-600">Cr ₹{entry.credit.toLocaleString()}</p>}
-                      </div>
-                    </div>
-                  ))}
+                <div className="p-3 bg-muted/50 rounded-lg space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Debits</span>
+                    <span className="font-medium text-red-500">₹{(Number(selectedAccountData.total_debit) || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Credits</span>
+                    <span className="font-medium text-green-600">₹{(Number(selectedAccountData.total_credit) || 0).toLocaleString()}</span>
+                  </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Detailed ledger entries will be available in a future update.
+                </p>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Click an account to view its ledger entries</p>
+              <p className="text-sm text-muted-foreground">Click an account to view its details</p>
             )}
           </CardContent>
         </Card>

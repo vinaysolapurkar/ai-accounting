@@ -9,7 +9,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Receipt, MessageSquare, ArrowLeftRight,
-  BookOpen, FileText, BarChart3, Building2, Link2, Settings, Sparkles, LogOut,
+  BookOpen, FileText, BarChart3, Building2, Link2, Settings, BookHeart, LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -40,10 +40,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SheetContent side="left" className="w-64 p-0">
           <div className="h-16 flex items-center px-4 border-b">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-bold">LedgerAI</span>
+              <BookHeart className="w-7 h-7 text-primary" />
+              <span className="text-lg font-bold" style={{fontFamily: 'var(--font-display)'}}>Numba</span>
             </Link>
           </div>
           <nav className="py-4 px-2 space-y-1">
@@ -78,9 +76,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </SheetContent>
       </Sheet>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <Header onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6 min-h-0">
           {children}
         </main>
       </div>

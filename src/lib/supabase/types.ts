@@ -136,16 +136,36 @@ export type CurrencyCode = "INR" | "USD" | "GBP" | "AUD" | "NZD" | "EUR";
 
 export const COUNTRY_CONFIG: Record<
   CountryCode,
-  { name: string; currency: CurrencyCode; fiscalYearStart: number; taxType: string }
+  { name: string; currency: CurrencyCode; currencySymbol: string; fiscalYearStart: number; taxType: string; taxRates: { label: string; rate: number }[]; defaultTaxRate: number }
 > = {
-  IN: { name: "India", currency: "INR", fiscalYearStart: 4, taxType: "GST" },
-  US: { name: "United States", currency: "USD", fiscalYearStart: 1, taxType: "Sales Tax" },
-  UK: { name: "United Kingdom", currency: "GBP", fiscalYearStart: 4, taxType: "VAT" },
-  AU: { name: "Australia", currency: "AUD", fiscalYearStart: 7, taxType: "GST" },
-  NZ: { name: "New Zealand", currency: "NZD", fiscalYearStart: 4, taxType: "GST" },
-  DE: { name: "Germany", currency: "EUR", fiscalYearStart: 1, taxType: "VAT" },
-  FR: { name: "France", currency: "EUR", fiscalYearStart: 1, taxType: "VAT" },
-  NL: { name: "Netherlands", currency: "EUR", fiscalYearStart: 1, taxType: "VAT" },
-  ES: { name: "Spain", currency: "EUR", fiscalYearStart: 1, taxType: "VAT" },
-  IT: { name: "Italy", currency: "EUR", fiscalYearStart: 1, taxType: "VAT" },
+  IN: { name: "India", currency: "INR", currencySymbol: "₹", fiscalYearStart: 4, taxType: "GST", defaultTaxRate: 18, taxRates: [
+    { label: "No Tax", rate: 0 }, { label: "GST 5%", rate: 5 }, { label: "GST 12%", rate: 12 }, { label: "GST 18%", rate: 18 }, { label: "GST 28%", rate: 28 },
+  ]},
+  US: { name: "United States", currency: "USD", currencySymbol: "$", fiscalYearStart: 1, taxType: "Sales Tax", defaultTaxRate: 0, taxRates: [
+    { label: "No Tax", rate: 0 }, { label: "Sales Tax 5%", rate: 5 }, { label: "Sales Tax 7%", rate: 7 }, { label: "Sales Tax 8.25%", rate: 8.25 }, { label: "Sales Tax 10%", rate: 10 },
+  ]},
+  UK: { name: "United Kingdom", currency: "GBP", currencySymbol: "£", fiscalYearStart: 4, taxType: "VAT", defaultTaxRate: 20, taxRates: [
+    { label: "No VAT", rate: 0 }, { label: "Reduced VAT 5%", rate: 5 }, { label: "Standard VAT 20%", rate: 20 },
+  ]},
+  AU: { name: "Australia", currency: "AUD", currencySymbol: "A$", fiscalYearStart: 7, taxType: "GST", defaultTaxRate: 10, taxRates: [
+    { label: "No GST", rate: 0 }, { label: "GST 10%", rate: 10 },
+  ]},
+  NZ: { name: "New Zealand", currency: "NZD", currencySymbol: "NZ$", fiscalYearStart: 4, taxType: "GST", defaultTaxRate: 15, taxRates: [
+    { label: "No GST", rate: 0 }, { label: "GST 15%", rate: 15 },
+  ]},
+  DE: { name: "Germany", currency: "EUR", currencySymbol: "€", fiscalYearStart: 1, taxType: "VAT", defaultTaxRate: 19, taxRates: [
+    { label: "No VAT", rate: 0 }, { label: "Reduced VAT 7%", rate: 7 }, { label: "Standard VAT 19%", rate: 19 },
+  ]},
+  FR: { name: "France", currency: "EUR", currencySymbol: "€", fiscalYearStart: 1, taxType: "VAT", defaultTaxRate: 20, taxRates: [
+    { label: "No VAT", rate: 0 }, { label: "Reduced VAT 5.5%", rate: 5.5 }, { label: "Intermediate VAT 10%", rate: 10 }, { label: "Standard VAT 20%", rate: 20 },
+  ]},
+  NL: { name: "Netherlands", currency: "EUR", currencySymbol: "€", fiscalYearStart: 1, taxType: "VAT", defaultTaxRate: 21, taxRates: [
+    { label: "No VAT", rate: 0 }, { label: "Reduced VAT 9%", rate: 9 }, { label: "Standard VAT 21%", rate: 21 },
+  ]},
+  ES: { name: "Spain", currency: "EUR", currencySymbol: "€", fiscalYearStart: 1, taxType: "VAT", defaultTaxRate: 21, taxRates: [
+    { label: "No IVA", rate: 0 }, { label: "Reduced IVA 10%", rate: 10 }, { label: "Standard IVA 21%", rate: 21 },
+  ]},
+  IT: { name: "Italy", currency: "EUR", currencySymbol: "€", fiscalYearStart: 1, taxType: "VAT", defaultTaxRate: 22, taxRates: [
+    { label: "No IVA", rate: 0 }, { label: "Reduced IVA 10%", rate: 10 }, { label: "Standard IVA 22%", rate: 22 },
+  ]},
 };

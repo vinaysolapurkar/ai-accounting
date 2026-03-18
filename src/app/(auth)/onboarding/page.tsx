@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Check, Sparkles } from "lucide-react";
+import { ArrowRight, Check, BookHeart } from "lucide-react";
 import { COUNTRY_CONFIG, type CountryCode } from "@/lib/supabase/types";
 
 const businessTypes = [
@@ -22,18 +22,39 @@ export default function OnboardingPage() {
   const [country, setCountry] = useState<CountryCode | "">("");
   const [businessType, setBusinessType] = useState("");
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     const stored = localStorage.getItem("ledgerai_user");
-    if (stored) {
-      const user = JSON.parse(stored);
-      const config = country ? COUNTRY_CONFIG[country as CountryCode] : null;
-      user.country = country;
-      user.currency = config?.currency || "USD";
-      user.fiscal_year_start = config?.fiscalYearStart || 1;
-      user.business_type = businessType;
-      user.onboarding_complete = true;
-      localStorage.setItem("ledgerai_user", JSON.stringify(user));
+    if (!stored) {
+      router.push("/login");
+      return;
     }
+
+    const user = JSON.parse(stored);
+
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "onboarding",
+          userId: user.id,
+          country,
+          businessType,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("Onboarding failed:", data.error);
+        return;
+      }
+
+      localStorage.setItem("ledgerai_user", JSON.stringify(data.user));
+    } catch (err) {
+      console.error("Onboarding failed:", err);
+    }
+
     router.push("/dashboard");
   };
 
@@ -41,10 +62,8 @@ export default function OnboardingPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
         <div className="flex items-center gap-2 mb-8 justify-center">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <span className="text-2xl font-bold">LedgerAI</span>
+          <BookHeart className="w-8 h-8 text-primary" />
+          <span className="text-2xl font-bold" style={{fontFamily: 'var(--font-display)'}}>Numba</span>
         </div>
 
         {/* Progress */}

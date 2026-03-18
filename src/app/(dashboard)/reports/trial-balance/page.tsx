@@ -1,13 +1,27 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Download, BarChart3, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-const trialBalance = [
+interface TrialBalanceEntry {
+  code: string;
+  name: string;
+  debit: number;
+  credit: number;
+}
+
+interface TrialBalanceData {
+  date: string;
+  entries: TrialBalanceEntry[];
+}
+
+const fallbackEntries: TrialBalanceEntry[] = [
   { code: "1000", name: "Cash", debit: 245000, credit: 0 },
   { code: "1010", name: "Bank Account", debit: 580000, credit: 0 },
   { code: "1100", name: "Accounts Receivable", debit: 150000, credit: 0 },
@@ -30,11 +44,77 @@ const trialBalance = [
   { code: "4100", name: "Product Revenue", debit: 0, credit: 120000 },
 ];
 
-const totalDebits = trialBalance.reduce((s, t) => s + t.debit, 0);
-const totalCredits = trialBalance.reduce((s, t) => s + t.credit, 0);
-const isBalanced = totalDebits === totalCredits;
+const fallbackData: TrialBalanceData = {
+  date: "March 18, 2026",
+  entries: fallbackEntries,
+};
+
+function getUserId(): string | null {
+  try {
+    const stored = localStorage.getItem("ledgerai_user");
+    if (stored) return JSON.parse(stored).id || null;
+  } catch {}
+  return null;
+}
 
 export default function TrialBalancePage() {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<TrialBalanceData>(fallbackData);
+
+  useEffect(() => {
+    const userId = getUserId();
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    fetch("/api/reports?type=trial-balance", {
+      headers: { "x-user-id": userId },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        if (res) {
+          const entries = Array.isArray(res) ? res : Array.isArray(res.entries) ? res.entries : null;
+          if (entries) {
+            setData({
+              date: res.date || fallbackData.date,
+              entries,
+            });
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const totalDebits = data.entries.reduce((s, t) => s + t.debit, 0);
+  const totalCredits = data.entries.reduce((s, t) => s + t.credit, 0);
+  const isBalanced = totalDebits === totalCredits;
+
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-4xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="w-10 h-10 rounded" />
+            <div>
+              <Skeleton className="h-7 w-48 mb-1" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </div>
+          <Skeleton className="h-9 w-24" />
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-full mb-2" />
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
@@ -42,7 +122,7 @@ export default function TrialBalancePage() {
           <Link href="/reports"><Button variant="ghost" size="icon"><ArrowLeft className="w-5 h-5" /></Button></Link>
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2"><BarChart3 className="w-6 h-6" /> Trial Balance</h1>
-            <p className="text-muted-foreground text-sm">As of March 18, 2026</p>
+            <p className="text-muted-foreground text-sm">As of {data.date}</p>
           </div>
         </div>
         <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2" /> Export</Button>
@@ -55,12 +135,12 @@ export default function TrialBalancePage() {
               <TableRow>
                 <TableHead>Code</TableHead>
                 <TableHead>Account</TableHead>
-                <TableHead className="text-right">Debit (₹)</TableHead>
-                <TableHead className="text-right">Credit (₹)</TableHead>
+                <TableHead className="text-right">Debit ({"\u20b9"})</TableHead>
+                <TableHead className="text-right">Credit ({"\u20b9"})</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {trialBalance.map((t) => (
+              {data.entries.map((t) => (
                 <TableRow key={t.code}>
                   <TableCell className="font-mono text-sm">{t.code}</TableCell>
                   <TableCell>{t.name}</TableCell>
@@ -82,7 +162,7 @@ export default function TrialBalancePage() {
         <CardContent className="p-4 flex items-center justify-between">
           <span className="font-semibold">Verification: Debits = Credits</span>
           <Badge variant={isBalanced ? "default" : "destructive"}>
-            {isBalanced ? "✓ Balanced" : `✗ Difference: ₹${Math.abs(totalDebits - totalCredits).toLocaleString()}`}
+            {isBalanced ? "\u2713 Balanced" : `\u2717 Difference: \u20b9${Math.abs(totalDebits - totalCredits).toLocaleString()}`}
           </Badge>
         </CardContent>
       </Card>
