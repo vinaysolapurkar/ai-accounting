@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Camera, Upload, FileImage, Loader2, Check, X, Edit2, Sparkles,
+  Camera, Upload, FileImage, Loader2, Check, X, Edit2, Sparkles, Eye,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { NewAccountDialog } from "@/components/new-account-dialog";
 import { getPlanLimits } from "@/lib/plan-limits";
@@ -36,10 +37,13 @@ interface ExtractedReceipt {
 
 interface PastReceipt {
   id: string;
+  image_url?: string;
   extracted_vendor: string;
   extracted_amount: number;
   extracted_date: string;
   extracted_category: string;
+  extracted_line_items?: { description: string; amount: number }[];
+  extracted_tax_info?: { type: string; rate: number; amount: number };
   status: string;
   created_at: string;
 }
@@ -55,6 +59,7 @@ export default function ReceiptsPage() {
   const [accounts, setAccounts] = useState<{ id: string; name: string; code: string; type: string }[]>([]);
   const [debitAccountId, setDebitAccountId] = useState("");
   const [creditAccountId, setCreditAccountId] = useState("");
+  const [viewReceipt, setViewReceipt] = useState<PastReceipt | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -441,10 +446,14 @@ export default function ReceiptsPage() {
             ) : (
               <div className="space-y-3">
                 {pastReceipts.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between p-3 border rounded-lg hover:shadow-sm transition-shadow">
+                  <div key={r.id} className="flex items-center justify-between p-3 border rounded-lg hover:shadow-sm transition-shadow cursor-pointer" onClick={() => setViewReceipt(r)}>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                        <FileImage className="w-5 h-5 text-muted-foreground" />
+                        {r.image_url ? (
+                          <img src={r.image_url} alt="Receipt" className="w-10 h-10 rounded-lg object-cover" />
+                        ) : (
+                          <FileImage className="w-5 h-5 text-muted-foreground" />
+                        )}
                       </div>
                       <div>
                         <p className="text-sm font-medium">{r.extracted_vendor || "Unknown"}</p>
@@ -453,11 +462,14 @@ export default function ReceiptsPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">₹{(Number(r.extracted_amount) || 0).toLocaleString()}</p>
-                      <Badge variant={r.status === "linked" ? "default" : r.status === "pending" ? "secondary" : "outline"} className="text-xs">
-                        {r.status}
-                      </Badge>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-sm font-semibold">₹{(Number(r.extracted_amount) || 0).toLocaleString()}</p>
+                        <Badge variant={r.status === "linked" ? "default" : r.status === "pending" ? "secondary" : "outline"} className="text-xs">
+                          {r.status}
+                        </Badge>
+                      </div>
+                      <Eye className="w-4 h-4 text-muted-foreground" />
                     </div>
                   </div>
                 ))}
@@ -466,6 +478,64 @@ export default function ReceiptsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Receipt Detail Modal */}
+      <Dialog open={!!viewReceipt} onOpenChange={() => setViewReceipt(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewReceipt?.extracted_vendor || "Receipt Details"}</DialogTitle>
+          </DialogHeader>
+          {viewReceipt && (
+            <div className="space-y-4">
+              {viewReceipt.image_url && (
+                <div className="border rounded-lg overflow-hidden bg-muted">
+                  <img src={viewReceipt.image_url} alt="Receipt" className="w-full object-contain max-h-[400px]" />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Vendor</p>
+                  <p className="font-medium">{viewReceipt.extracted_vendor || "Unknown"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Amount</p>
+                  <p className="font-semibold">₹{(Number(viewReceipt.extracted_amount) || 0).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Date</p>
+                  <p className="font-medium">{formatDate(viewReceipt.extracted_date || viewReceipt.created_at)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Category</p>
+                  <p className="font-medium">{viewReceipt.extracted_category || "Uncategorized"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Status</p>
+                  <Badge variant={viewReceipt.status === "linked" ? "default" : "secondary"}>{viewReceipt.status}</Badge>
+                </div>
+              </div>
+              {viewReceipt.extracted_line_items && viewReceipt.extracted_line_items.length > 0 && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Line Items</p>
+                  <div className="space-y-1">
+                    {viewReceipt.extracted_line_items.map((item: any, i: number) => (
+                      <div key={i} className="flex justify-between text-sm border-b pb-1">
+                        <span>{item.description}</span>
+                        <span className="font-medium">₹{item.amount}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {viewReceipt.extracted_tax_info && (
+                <div className="text-sm">
+                  <p className="text-muted-foreground">Tax: {viewReceipt.extracted_tax_info.type} @ {viewReceipt.extracted_tax_info.rate}% = ₹{viewReceipt.extracted_tax_info.amount}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

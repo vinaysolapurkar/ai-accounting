@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     if (userId) {
       try {
         const receipt = await createReceipt(userId, {
+          image_url: image || undefined,
           raw_ocr_data: extracted,
           extracted_vendor: extracted.vendor,
           extracted_amount: extracted.amount,
