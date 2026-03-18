@@ -268,7 +268,7 @@ export default function TransactionsPage() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Income</p>
@@ -299,29 +299,29 @@ export default function TransactionsPage() {
             <p className="text-sm font-bold" style={{fontFamily: 'var(--font-display)'}}>Add New Transaction</p>
             <span className="text-xs text-muted-foreground hidden sm:inline">Type and press Enter</span>
           </div>
-          <div className="flex items-center gap-2 flex-wrap" onKeyDown={handleEntryKeyDown}>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap" onKeyDown={handleEntryKeyDown}>
             <Input
               type="date"
               value={entryDate}
               onChange={(e) => setEntryDate(e.target.value)}
-              className="w-[130px] h-9 text-sm"
+              className="w-full sm:w-[130px] h-9 text-sm"
             />
             <Input
               ref={descRef}
               placeholder="Description — e.g. Lunch at cafe"
               value={entryDesc}
               onChange={(e) => { setEntryDesc(e.target.value); if (!e.target.value) { setEntryDebit(""); setEntryCredit(""); } }}
-              className="flex-1 min-w-[180px] h-9 text-sm"
+              className="w-full sm:flex-1 sm:min-w-[180px] h-9 text-sm"
             />
             <Input
               type="number"
               placeholder="Amount"
               value={entryAmount}
               onChange={(e) => setEntryAmount(e.target.value)}
-              className="w-[100px] h-9 text-sm"
+              className="w-full sm:w-[100px] h-9 text-sm"
             />
             <Select value={entryDebit} onValueChange={(v) => setEntryDebit(v || "")}>
-              <SelectTrigger className="w-[150px] h-9 text-xs">
+              <SelectTrigger className="w-full sm:w-[150px] h-9 text-xs">
                 <SelectValue placeholder="Debit A/c">
                   {getAccountLabel(entryDebit)}
                 </SelectValue>
@@ -333,7 +333,7 @@ export default function TransactionsPage() {
               </SelectContent>
             </Select>
             <Select value={entryCredit} onValueChange={(v) => setEntryCredit(v || "")}>
-              <SelectTrigger className="w-[150px] h-9 text-xs">
+              <SelectTrigger className="w-full sm:w-[150px] h-9 text-xs">
                 <SelectValue placeholder="Credit A/c">
                   {getAccountLabel(entryCredit)}
                 </SelectValue>
@@ -346,7 +346,7 @@ export default function TransactionsPage() {
             </Select>
             <Button
               size="sm"
-              className="h-9 px-3 shrink-0"
+              className="w-full sm:w-auto h-9 px-3 shrink-0"
               disabled={!canSubmit || submitting}
               onClick={handleQuickAdd}
             >
@@ -373,7 +373,7 @@ export default function TransactionsPage() {
           <Input placeholder="Search transactions..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v || "all")}>
-          <SelectTrigger className="w-[140px]"><Filter className="w-4 h-4 mr-2" /><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[140px]"><Filter className="w-4 h-4 mr-2" /><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="income">Income</SelectItem>
@@ -381,7 +381,7 @@ export default function TransactionsPage() {
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v || "all")}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="draft">Draft</SelectItem>

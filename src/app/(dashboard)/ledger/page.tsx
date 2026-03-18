@@ -99,7 +99,7 @@ export default function LedgerPage() {
 
       <div className="flex gap-3 items-center justify-between">
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v || "all")}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filter by type" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by type" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="asset">Assets</SelectItem>

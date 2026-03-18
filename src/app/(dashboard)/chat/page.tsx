@@ -187,7 +187,7 @@ export default function ChatPage() {
                     <Sparkles className="w-4 h-4 text-primary-foreground" />
                   </div>
                 )}
-                <div className={`max-w-[80%] rounded-xl px-4 py-3 ${
+                <div className={`max-w-[92%] sm:max-w-[80%] rounded-xl px-4 py-3 ${
                   msg.role === "user"
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted"
@@ -230,7 +230,7 @@ export default function ChatPage() {
         {/* Suggestions */}
         {!hasHistory && (
           <div className="px-4 pb-2">
-            <div className="grid grid-cols-2 gap-2 max-w-3xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-3xl mx-auto">
               {suggestedQueries.map((q, i) => (
                 <button
                   key={i}

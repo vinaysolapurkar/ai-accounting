@@ -1,23 +1,16 @@
 {
-  "name": "LedgerAI - AI Accounting",
-  "short_name": "LedgerAI",
-  "description": "AI-powered accounting for small businesses and freelancers",
+  "name": "Numba — Simple Accounting",
+  "short_name": "Numba",
+  "description": "Simple, friendly accounting for small businesses. Snap receipts, track expenses, get reports.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0f172a",
-  "orientation": "portrait-primary",
+  "background_color": "#FFF9F5",
+  "theme_color": "#F2756D",
+  "orientation": "any",
   "icons": [
-    {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
-  "categories": ["finance", "business", "productivity"]
+  "categories": ["finance", "business", "productivity"],
+  "prefer_related_applications": false
 }

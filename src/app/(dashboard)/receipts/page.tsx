@@ -326,7 +326,7 @@ export default function ReceiptsPage() {
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs text-muted-foreground">Vendor</Label>
                       {isEditing ? (
@@ -374,7 +374,7 @@ export default function ReceiptsPage() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs text-muted-foreground">Debit Account</Label>
                       <Select value={debitAccountId} onValueChange={(v) => setDebitAccountId(v || "")}>

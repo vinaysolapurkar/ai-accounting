@@ -147,7 +147,7 @@ export default function NewInvoicePage() {
             <Card>
               <CardHeader><CardTitle className="text-lg">Client Details</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div><Label>Client Name</Label><Input placeholder="Company or person name" required value={clientName} onChange={(e) => setClientName(e.target.value)} /></div>
                   <div><Label>Client Email</Label><Input type="email" placeholder="client@example.com" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} /></div>
                 </div>
@@ -163,23 +163,23 @@ export default function NewInvoicePage() {
               <CardHeader><CardTitle className="text-lg">Line Items</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 {lineItems.map((item, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-5">
+                  <div key={i} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                    <div className="sm:col-span-5">
                       {i === 0 && <Label className="text-xs">Description</Label>}
                       <Input placeholder="Service or product" value={item.description} onChange={(e) => updateLineItem(i, "description", e.target.value)} />
                     </div>
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                       {i === 0 && <Label className="text-xs">Qty</Label>}
                       <Input type="number" min={1} value={item.quantity} onChange={(e) => updateLineItem(i, "quantity", parseInt(e.target.value) || 0)} />
                     </div>
-                    <div className="col-span-3">
+                    <div className="sm:col-span-3">
                       {i === 0 && <Label className="text-xs">Unit Price</Label>}
                       <Input type="number" min={0} value={item.unitPrice} onChange={(e) => updateLineItem(i, "unitPrice", parseFloat(e.target.value) || 0)} />
                     </div>
-                    <div className="col-span-1 text-right font-mono text-sm py-2">
+                    <div className="sm:col-span-1 text-right font-mono text-sm py-2">
                       {currencySymbol}{(item.quantity * item.unitPrice).toLocaleString()}
                     </div>
-                    <div className="col-span-1">
+                    <div className="sm:col-span-1">
                       {lineItems.length > 1 && (
                         <Button type="button" variant="ghost" size="icon" onClick={() => removeLineItem(i)}>
                           <Trash2 className="w-4 h-4 text-destructive" />

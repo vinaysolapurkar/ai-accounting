@@ -197,11 +197,11 @@ export default function SettingsPage() {
           <CardTitle className="text-lg flex items-center gap-2"><User className="w-5 h-5" /> Business Profile</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><Label>Business Name</Label><Input value={user.business_name || ""} onChange={(e) => setUser({...user, business_name: e.target.value})} /></div>
             <div><Label>Email</Label><Input value={user.email} disabled /></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><Label>Country</Label>
               <Select value={user.country} onValueChange={(v) => {
                 const c = COUNTRY_CONFIG[v as CountryCode];
@@ -221,7 +221,7 @@ export default function SettingsPage() {
             </div>
             <div><Label>Currency</Label><Input value={`${config?.currencySymbol || ""} ${user.currency}`} disabled className="bg-muted" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Tax ID ({config?.taxType === "GST" ? "GSTIN" : config?.taxType === "VAT" ? "VAT Number" : "Tax ID"})</Label>
               <Input value={user.tax_id || ""} onChange={(e) => setUser({...user, tax_id: e.target.value})} placeholder="Enter your tax ID" />

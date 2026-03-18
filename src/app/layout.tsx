@@ -3,6 +3,8 @@ import { DM_Sans, DM_Mono, Quicksand } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
+import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -58,6 +60,8 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <TooltipProvider>
             {children}
+            <PwaInstallPrompt />
+            <ServiceWorkerRegister />
             <Toaster />
           </TooltipProvider>
         </ThemeProvider>
